@@ -217,6 +217,10 @@ def _add_group_chart_sheet(
     chart.y_axis.title = "Signal-to-noise ratio"
     chart.x_axis.tickLblPos = "nextTo"
     chart.y_axis.tickLblPos = "nextTo"
+    chart.x_axis.delete = False
+    chart.y_axis.delete = False
+    chart.x_axis.majorTickMark = "out"
+    chart.y_axis.majorTickMark = "out"
     chart.x_axis.scaling.min = 5
     elevation_cols = [
         col for col in output_frame.columns if col.endswith("6_2_elevation")
@@ -415,6 +419,10 @@ def main() -> int:
                 chart.y_axis.title = "SNR"
                 chart.x_axis.tickLblPos = "nextTo"
                 chart.y_axis.tickLblPos = "nextTo"
+                chart.x_axis.delete = False
+                chart.y_axis.delete = False
+                chart.x_axis.majorTickMark = "out"
+                chart.y_axis.majorTickMark = "out"
                 data_start_row = header_row + 1
                 data_end_row = data_start_row + correlation_frame.shape[0] - 1
                 azimuth_col = 1
