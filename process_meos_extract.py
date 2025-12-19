@@ -105,6 +105,7 @@ def main() -> int:
     combined = pd.concat(combined_frames, ignore_index=True)
     combined = combined.sort_values("time_iso_utc")
     combined = combined.drop_duplicates(subset=["time_iso_utc"], keep="first")
+    combined["time_iso_utc"] = combined["time_iso_utc"].dt.tz_localize(None)
 
     combined.to_excel(output_path, index=False)
     print(f"Saved {len(combined)} rows to {output_path}")
