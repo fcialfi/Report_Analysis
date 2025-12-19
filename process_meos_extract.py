@@ -150,21 +150,22 @@ def main() -> int:
     if not excel_files:
         raise SystemExit(f"No Excel files found in {folder}")
 
-    processed_frames = []
+    processed_frames: List[Tuple[pd.DataFrame, pd.Timestamp, pd.Timestamp]] = []
     for path in sorted(excel_files):
         frame = _process_file(path)
         start_time = _extract_start_time(path)
-        processed_frames.append((frame, start_time))
+        group_time = start_time.floor("h")
+        processed_frames.append((frame, start_time, group_time))
 
     existing_sheets: Dict[str, pd.DataFrame] = {}
     if output_path.exists():
         existing_sheets = pd.read_excel(output_path, sheet_name=None, header=1)
 
-    origin = min(start_time for _, start_time in processed_frames)
+    origin = min(group_time for _, _, group_time in processed_frames)
     nine_days = pd.Timedelta(days=9)
     grouped_frames: Dict[int, List[Tuple[pd.DataFrame, pd.Timestamp]]] = {}
-    for frame, start_time in processed_frames:
-        remainder = (start_time - origin) % nine_days
+    for frame, start_time, group_time in processed_frames:
+        remainder = (group_time - origin) % nine_days
         key = int(remainder.total_seconds())
         grouped_frames.setdefault(key, []).append((frame, start_time))
 
@@ -221,7 +222,7 @@ def main() -> int:
                 title_cell.value = sheet_name
                 title_cell.alignment = Alignment(horizontal="center")
 
-    total_rows = sum(len(frame) for frame, _ in processed_frames)
+    total_rows = sum(len(frame) for frame, _, _ in processed_frames)
     print(f"Saved {total_rows} rows to {output_path}")
     return 0
 
