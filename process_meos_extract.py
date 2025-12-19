@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import re
 from pathlib import Path
 
 import pandas as pd
@@ -59,8 +60,19 @@ def _process_file(path: Path) -> pd.DataFrame:
     merged = snr.merge(azimuth, on="time_iso_utc", how="inner").merge(
         elevation, on="time_iso_utc", how="inner"
     )
+    merged["orbit"] = _extract_orbit(path)
     merged = merged.sort_values("time_iso_utc")
     return merged
+
+
+def _extract_orbit(path: Path) -> int:
+    match = re.search(r"orbit[_-]?(\d+)", path.stem, flags=re.IGNORECASE)
+    if not match:
+        raise ValueError(
+            f"Unable to determine orbit from filename '{path.name}'. "
+            "Expected pattern like 'orbit_2648'."
+        )
+    return int(match.group(1))
 
 
 def main() -> int:
