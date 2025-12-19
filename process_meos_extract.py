@@ -167,6 +167,18 @@ def _max_center_elevation(series: pd.Series, center_fraction: float = 0.5) -> fl
     return float(values.iloc[start:end].max())
 
 
+def _signed_elevation(series: pd.Series) -> pd.Series:
+    numeric = pd.to_numeric(series, errors="coerce")
+    if numeric.dropna().empty:
+        return series.copy()
+    max_index = numeric.idxmax()
+    signed = numeric.copy()
+    before_mask = signed.index < max_index
+    signed[before_mask] = -signed[before_mask].abs()
+    signed[~before_mask] = signed[~before_mask].abs()
+    return signed
+
+
 def _build_correlation_table(
     frames: List[pd.DataFrame], azimuth_tolerance: float, elevation_tolerance: float
 ) -> pd.DataFrame:
@@ -221,34 +233,54 @@ def _add_group_chart_sheet(
     chart.y_axis.delete = False
     chart.x_axis.majorTickMark = "out"
     chart.y_axis.majorTickMark = "out"
-    chart.x_axis.scaling.min = 5
+    signed_elevation_cols = [
+        col for col in output_frame.columns if col.endswith("6_2_elevation_signed")
+    ]
     elevation_cols = [
         col for col in output_frame.columns if col.endswith("6_2_elevation")
     ]
-    if elevation_cols:
+    if signed_elevation_cols:
+        chart.x_axis.title = "Elevation (deg, signed)"
         max_elevation = max(
             (
-                _max_center_elevation(output_frame[col])
-                for col in elevation_cols
+                _max_center_elevation(output_frame[col].abs())
+                for col in signed_elevation_cols
             ),
             default=float("nan"),
         )
         if pd.notna(max_elevation):
-            chart.x_axis.scaling.max = max(5, math.ceil(float(max_elevation)))
+            max_elevation = max(5, math.ceil(float(max_elevation)))
+            chart.x_axis.scaling.min = -max_elevation
+            chart.x_axis.scaling.max = max_elevation
+    else:
+        chart.x_axis.scaling.min = 5
+        if elevation_cols:
+            max_elevation = max(
+                (
+                    _max_center_elevation(output_frame[col])
+                    for col in elevation_cols
+                ),
+                default=float("nan"),
+            )
+            if pd.notna(max_elevation):
+                chart.x_axis.scaling.max = max(5, math.ceil(float(max_elevation)))
 
     headers = list(output_frame.columns)
     elevation_cols: Dict[str, int] = {}
+    signed_elevation_cols: Dict[str, int] = {}
     snr_cols: Dict[str, int] = {}
     for idx, name in enumerate(headers, start=1):
         if name.endswith("6_2_elevation"):
             elevation_cols[name.split(" ")[1]] = idx
+        elif name.endswith("6_2_elevation_signed"):
+            signed_elevation_cols[name.split(" ")[1]] = idx
         elif name.endswith("5_10_signal_noise_ratio"):
             snr_cols[name.split(" ")[1]] = idx
 
     data_start_row = 3
     data_end_row = 2 + output_frame.shape[0]
     for orbit, snr_col in sorted(snr_cols.items(), key=lambda item: int(item[0])):
-        elev_col = elevation_cols.get(orbit)
+        elev_col = signed_elevation_cols.get(orbit) or elevation_cols.get(orbit)
         if elev_col is None:
             continue
         values = Reference(
@@ -353,11 +385,17 @@ def main() -> int:
                 ]
                 block = frame[columns].copy().reset_index(drop=True)
                 block["time_iso_utc"] = block["time_iso_utc"].dt.tz_localize(None)
+                block["6_2_elevation_signed"] = _signed_elevation(
+                    block["6_2_elevation"]
+                )
                 block = block.rename(
                     columns={
                         "time_iso_utc": f"Orbit {orbit} time_iso_utc",
                         "6_1_azimuth": f"Orbit {orbit} 6_1_azimuth",
                         "6_2_elevation": f"Orbit {orbit} 6_2_elevation",
+                        "6_2_elevation_signed": (
+                            f"Orbit {orbit} 6_2_elevation_signed"
+                        ),
                         "5_10_signal_noise_ratio": (
                             f"Orbit {orbit} 5_10_signal_noise_ratio"
                         ),
