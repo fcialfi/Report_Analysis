@@ -69,15 +69,15 @@ def _process_file(path: Path) -> pd.DataFrame:
 
 def _extract_start_time(path: Path) -> pd.Timestamp:
     excel = pd.ExcelFile(path)
-    if "__meta" not in excel.sheet_names:
+    if "__meta__" not in excel.sheet_names:
         available = ", ".join(excel.sheet_names)
         raise ValueError(
-            f"Worksheet named '__meta' not found in {path}. "
+            f"Worksheet named '__meta__' not found in {path}. "
             f"Available worksheets: {available or 'None'}."
         )
-    meta = pd.read_excel(excel, sheet_name="__meta")
+    meta = pd.read_excel(excel, sheet_name="__meta__")
     if meta.empty:
-        raise ValueError(f"Sheet '__meta' in {path} is empty.")
+        raise ValueError(f"Sheet '__meta__' in {path} is empty.")
     start_time = None
     if "start_time_utc" in meta.columns:
         values = meta["start_time_utc"].dropna()
