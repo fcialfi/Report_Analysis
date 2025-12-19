@@ -215,6 +215,8 @@ def _add_group_chart_sheet(
     chart.title = f"{sheet_name} SNR vs Elevation"
     chart.x_axis.title = "Elevation (deg)"
     chart.y_axis.title = "Signal-to-noise ratio"
+    chart.x_axis.tickLblPos = "nextTo"
+    chart.y_axis.tickLblPos = "nextTo"
     chart.x_axis.scaling.min = 5
     elevation_cols = [
         col for col in output_frame.columns if col.endswith("6_2_elevation")
@@ -411,6 +413,8 @@ def main() -> int:
                 chart.title = "SNR by Orbit (Matched Az/El)"
                 chart.x_axis.title = "Azimuth (binned)"
                 chart.y_axis.title = "SNR"
+                chart.x_axis.tickLblPos = "nextTo"
+                chart.y_axis.tickLblPos = "nextTo"
                 data_start_row = header_row + 1
                 data_end_row = data_start_row + correlation_frame.shape[0] - 1
                 azimuth_col = 1
