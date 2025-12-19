@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import math
 import re
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -188,7 +189,15 @@ def _add_group_chart_sheet(
     chart.x_axis.title = "Elevation (deg)"
     chart.y_axis.title = "Signal-to-noise ratio"
     chart.x_axis.scaling.min = 3
-    chart.x_axis.scaling.max = 90
+    elevation_cols = [
+        col for col in output_frame.columns if col.endswith("6_2_elevation")
+    ]
+    if elevation_cols:
+        max_elevation = pd.to_numeric(
+            output_frame[elevation_cols].stack(), errors="coerce"
+        ).max()
+        if pd.notna(max_elevation):
+            chart.x_axis.scaling.max = max(3, math.ceil(float(max_elevation)))
 
     headers = list(output_frame.columns)
     elevation_cols: Dict[str, int] = {}
