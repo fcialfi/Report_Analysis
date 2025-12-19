@@ -126,6 +126,9 @@ def main() -> int:
                 "6_2_elevation",
             ]
             output_frame = frame[columns].copy()
+            output_frame["time_iso_utc"] = output_frame["time_iso_utc"].dt.tz_localize(
+                None
+            )
             output_frame.to_excel(
                 writer,
                 sheet_name=sheet_name,
