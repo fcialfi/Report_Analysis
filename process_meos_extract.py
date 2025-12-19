@@ -6,6 +6,7 @@ from typing import Dict, List, Tuple
 
 import pandas as pd
 from openpyxl.chart import ScatterChart, Series, Reference
+from openpyxl.chart.series import SeriesLabel
 from openpyxl.styles import Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 
@@ -319,7 +320,9 @@ def main() -> int:
                         max_row=data_end_row,
                     )
                     series = Series(values, xvalues, title_from_data=False)
-                    series.title = worksheet.cell(row=header_row, column=col).value
+                    label_value = worksheet.cell(row=header_row, column=col).value
+                    if label_value is not None:
+                        series.title = SeriesLabel(v=str(label_value))
                     chart.series.append(series)
                 chart_anchor = f"A{data_end_row + 2}"
                 worksheet.add_chart(chart, chart_anchor)
