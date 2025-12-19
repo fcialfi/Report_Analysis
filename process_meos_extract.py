@@ -4,6 +4,7 @@ import re
 from pathlib import Path
 
 import pandas as pd
+from openpyxl.styles import Alignment
 
 
 def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
@@ -110,17 +111,30 @@ def main() -> int:
     if not excel_files:
         raise SystemExit(f"No Excel files found in {folder}")
 
-    combined_frames = []
+    processed_frames = []
     for path in sorted(excel_files):
-        combined_frames.append(_process_file(path))
+        processed_frames.append(_process_file(path))
 
-    combined = pd.concat(combined_frames, ignore_index=True)
-    combined = combined.sort_values("time_iso_utc")
-    combined = combined.drop_duplicates(subset=["time_iso_utc"], keep="first")
-    combined["time_iso_utc"] = combined["time_iso_utc"].dt.tz_localize(None)
+    with pd.ExcelWriter(output_path, engine="openpyxl") as writer:
+        for frame in processed_frames:
+            orbit = int(frame["orbit"].iloc[0])
+            sheet_name = f"Orbit {orbit}"
+            columns = ["5_10_signal_noise_ratio", "6_1_azimuth", "6_2_elevation"]
+            output_frame = frame[columns].copy()
+            output_frame.to_excel(
+                writer,
+                sheet_name=sheet_name,
+                index=False,
+                startrow=1,
+            )
+            worksheet = writer.sheets[sheet_name]
+            worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+            title_cell = worksheet.cell(row=1, column=1)
+            title_cell.value = sheet_name
+            title_cell.alignment = Alignment(horizontal="center")
 
-    combined.to_excel(output_path, index=False)
-    print(f"Saved {len(combined)} rows to {output_path}")
+    total_rows = sum(len(frame) for frame in processed_frames)
+    print(f"Saved {total_rows} rows to {output_path}")
     return 0
 
 
