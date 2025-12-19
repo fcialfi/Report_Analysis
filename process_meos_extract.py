@@ -207,6 +207,7 @@ def main() -> int:
 
     processed_frames: List[Tuple[pd.DataFrame, pd.Timestamp, pd.Timestamp]] = []
     for path in sorted(excel_files):
+        print(f"Processing Excel file: {path.name}")
         frame = _process_file(path)
         start_time = _extract_start_time(path)
         group_time = start_time.floor("h")
