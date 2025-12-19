@@ -154,6 +154,8 @@ def _bin_series(series: pd.Series, tolerance: float) -> pd.Series:
 
 
 def _max_center_elevation(series: pd.Series, center_fraction: float = 0.5) -> float:
+    if isinstance(series, pd.DataFrame):
+        series = pd.Series(series.to_numpy().ravel())
     values = pd.to_numeric(series, errors="coerce").dropna().reset_index(drop=True)
     if values.empty:
         return float("nan")
