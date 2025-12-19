@@ -7,13 +7,28 @@ import pandas as pd
 
 def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
     excel = pd.ExcelFile(path)
+    resolved_sheet = sheet_name
     if sheet_name not in excel.sheet_names:
-        available = ", ".join(excel.sheet_names)
-        raise ValueError(
-            f"Worksheet named '{sheet_name}' not found in {path}. "
-            f"Available worksheets: {available or 'None'}."
-        )
-    df = pd.read_excel(excel, sheet_name=sheet_name)
+        matching_sheets = []
+        for candidate in excel.sheet_names:
+            preview = pd.read_excel(excel, sheet_name=candidate, nrows=0)
+            if sheet_name in preview.columns:
+                matching_sheets.append(candidate)
+        if len(matching_sheets) == 1:
+            resolved_sheet = matching_sheets[0]
+        else:
+            available = ", ".join(excel.sheet_names)
+            if matching_sheets:
+                matches = ", ".join(matching_sheets)
+                raise ValueError(
+                    f"Worksheet named '{sheet_name}' not found in {path}. "
+                    f"Multiple worksheets contain '{sheet_name}': {matches}."
+                )
+            raise ValueError(
+                f"Worksheet named '{sheet_name}' not found in {path}. "
+                f"Available worksheets: {available or 'None'}."
+            )
+    df = pd.read_excel(excel, sheet_name=resolved_sheet)
     if df.empty:
         raise ValueError(f"Sheet '{sheet_name}' in {path} is empty.")
     time_col = "time_iso_utc"
@@ -23,7 +38,7 @@ def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
         )
     if sheet_name not in df.columns:
         raise ValueError(
-            f"Sheet '{sheet_name}' in {path} is missing required '{sheet_name}' column."
+            f"Sheet '{resolved_sheet}' in {path} is missing required '{sheet_name}' column."
         )
     data = df[[time_col, sheet_name]].copy()
     data[time_col] = pd.to_datetime(data[time_col], errors="coerce", utc=True)
