@@ -119,7 +119,12 @@ def main() -> int:
         for frame in processed_frames:
             orbit = int(frame["orbit"].iloc[0])
             sheet_name = f"Orbit {orbit}"
-            columns = ["5_10_signal_noise_ratio", "6_1_azimuth", "6_2_elevation"]
+            columns = [
+                "time_iso_utc",
+                "5_10_signal_noise_ratio",
+                "6_1_azimuth",
+                "6_2_elevation",
+            ]
             output_frame = frame[columns].copy()
             output_frame.to_excel(
                 writer,
@@ -128,7 +133,7 @@ def main() -> int:
                 startrow=1,
             )
             worksheet = writer.sheets[sheet_name]
-            worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
+            worksheet.merge_cells(start_row=1, start_column=1, end_row=1, end_column=4)
             title_cell = worksheet.cell(row=1, column=1)
             title_cell.value = sheet_name
             title_cell.alignment = Alignment(horizontal="center")
