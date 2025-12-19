@@ -173,6 +173,56 @@ def _build_correlation_table(
     return merged.sort_values(["azimuth_bin", "elevation_bin"]).reset_index(drop=True)
 
 
+def _add_group_chart_sheet(
+    workbook,
+    source_sheet,
+    sheet_name: str,
+    output_frame: pd.DataFrame,
+) -> None:
+    if output_frame.empty:
+        return
+
+    chart_sheet = workbook.create_sheet(title=f"{sheet_name} Chart")
+    chart = ScatterChart()
+    chart.title = f"{sheet_name} SNR vs Elevation"
+    chart.x_axis.title = "Elevation (deg)"
+    chart.y_axis.title = "Signal-to-noise ratio"
+    chart.x_axis.scaling.min = 3
+    chart.x_axis.scaling.max = 90
+
+    headers = list(output_frame.columns)
+    elevation_cols: Dict[str, int] = {}
+    snr_cols: Dict[str, int] = {}
+    for idx, name in enumerate(headers, start=1):
+        if name.endswith("6_2_elevation"):
+            elevation_cols[name.split(" ")[1]] = idx
+        elif name.endswith("5_10_signal_noise_ratio"):
+            snr_cols[name.split(" ")[1]] = idx
+
+    data_start_row = 3
+    data_end_row = 2 + output_frame.shape[0]
+    for orbit, snr_col in sorted(snr_cols.items(), key=lambda item: int(item[0])):
+        elev_col = elevation_cols.get(orbit)
+        if elev_col is None:
+            continue
+        values = Reference(
+            source_sheet,
+            min_col=snr_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        xvalues = Reference(
+            source_sheet,
+            min_col=elev_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        series = Series(values, xvalues, title=f"Orbit {orbit}")
+        chart.series.append(series)
+
+    chart_sheet.add_chart(chart, "A1")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -292,6 +342,8 @@ def main() -> int:
                 title_cell = worksheet.cell(row=1, column=1)
                 title_cell.value = sheet_name
                 title_cell.alignment = Alignment(horizontal="center")
+
+            _add_group_chart_sheet(writer.book, worksheet, sheet_name, output_frame)
 
             frames_only = [frame for frame, _ in group_items]
             correlation_frame = _build_correlation_table(
