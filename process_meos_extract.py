@@ -6,7 +6,14 @@ import pandas as pd
 
 
 def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
-    df = pd.read_excel(path, sheet_name=sheet_name)
+    excel = pd.ExcelFile(path)
+    if sheet_name not in excel.sheet_names:
+        available = ", ".join(excel.sheet_names)
+        raise ValueError(
+            f"Worksheet named '{sheet_name}' not found in {path}. "
+            f"Available worksheets: {available or 'None'}."
+        )
+    df = pd.read_excel(excel, sheet_name=sheet_name)
     if df.empty:
         raise ValueError(f"Sheet '{sheet_name}' in {path} is empty.")
     time_col = "time_iso_utc"
