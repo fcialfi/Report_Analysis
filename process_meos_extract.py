@@ -88,11 +88,13 @@ def main() -> int:
     if not folder.exists() or not folder.is_dir():
         raise SystemExit(f"Folder not found: {folder}")
 
+    output_path = Path(args.output).resolve()
     excel_files = [
         *folder.glob("*.xlsx"),
         *folder.glob("*.xls"),
         *folder.glob("*.xlsm"),
     ]
+    excel_files = [path for path in excel_files if path.resolve() != output_path]
     if not excel_files:
         raise SystemExit(f"No Excel files found in {folder}")
 
@@ -104,7 +106,6 @@ def main() -> int:
     combined = combined.sort_values("time_iso_utc")
     combined = combined.drop_duplicates(subset=["time_iso_utc"], keep="first")
 
-    output_path = Path(args.output).resolve()
     combined.to_excel(output_path, index=False)
     print(f"Saved {len(combined)} rows to {output_path}")
     return 0
