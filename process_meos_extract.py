@@ -302,6 +302,7 @@ def _add_group_chart_sheet(
         signed_series = output_frame[
             f"Orbit {orbit} 6_2_elevation_signed"
         ].reset_index(drop=True)
+        signed_series = pd.to_numeric(signed_series, errors="coerce")
 
         for row_offset, (elev, snr, signed) in enumerate(
             zip(elev_series, snr_series, signed_series), start=data_start_row
