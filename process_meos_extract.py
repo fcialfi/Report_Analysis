@@ -83,7 +83,20 @@ def _process_file(path: Path) -> pd.DataFrame:
     )
     merged["orbit"] = _extract_orbit(path)
     merged = merged.sort_values("time_iso_utc")
-    return merged
+    return _trim_final_high_elevation(merged)
+
+
+def _trim_final_high_elevation(
+    frame: pd.DataFrame, threshold: float = 5.0
+) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+    elevation = pd.to_numeric(frame["6_2_elevation"], errors="coerce")
+    valid_mask = elevation <= threshold
+    if not valid_mask.any():
+        return frame.iloc[0:0].copy()
+    last_valid_index = valid_mask[valid_mask].index[-1]
+    return frame.loc[:last_valid_index].copy()
 
 
 def _extract_start_time(path: Path) -> pd.Timestamp:
