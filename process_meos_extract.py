@@ -28,10 +28,12 @@ def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
                 f"Worksheet named '{sheet_name}' not found in {path}. "
                 f"Available worksheets: {available or 'None'}."
             )
+    time_col = "time_iso_utc"
     df = pd.read_excel(excel, sheet_name=resolved_sheet)
     if df.empty:
-        raise ValueError(f"Sheet '{sheet_name}' in {path} is empty.")
-    time_col = "time_iso_utc"
+        print(f"Warning: sheet '{sheet_name}' in {path} is empty; skipping data.")
+        empty_frame = pd.DataFrame(columns=[time_col, sheet_name])
+        return empty_frame
     if time_col not in df.columns:
         raise ValueError(
             f"Sheet '{sheet_name}' in {path} is missing required '{time_col}' column."
