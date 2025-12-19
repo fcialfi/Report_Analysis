@@ -36,9 +36,9 @@ def _load_sheet(path: Path, sheet_name: str, value_name: str) -> pd.DataFrame:
 
 
 def _process_file(path: Path) -> pd.DataFrame:
-    snr = _load_sheet(path, "signal_noise_ratio", "signal_noise_ratio")
-    azimuth = _load_sheet(path, "azimuth", "azimuth")
-    elevation = _load_sheet(path, "elevation", "elevation")
+    snr = _load_sheet(path, "5_10_signal_noise_ratio", "signal_noise_ratio")
+    azimuth = _load_sheet(path, "6_1_azimuth", "azimuth")
+    elevation = _load_sheet(path, "6_2_elevation", "elevation")
 
     merged = snr.merge(azimuth, on="time_utc", how="inner").merge(
         elevation, on="time_utc", how="inner"
