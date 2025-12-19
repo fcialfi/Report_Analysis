@@ -140,6 +140,18 @@ def _bin_series(series: pd.Series, tolerance: float) -> pd.Series:
     return (series / tolerance).round() * tolerance
 
 
+def _max_center_elevation(series: pd.Series, center_fraction: float = 0.5) -> float:
+    values = pd.to_numeric(series, errors="coerce").dropna().reset_index(drop=True)
+    if values.empty:
+        return float("nan")
+    if not (0 < center_fraction <= 1):
+        center_fraction = 0.5
+    window = max(1, int(round(len(values) * center_fraction)))
+    start = max(0, (len(values) - window) // 2)
+    end = start + window
+    return float(values.iloc[start:end].max())
+
+
 def _build_correlation_table(
     frames: List[pd.DataFrame], azimuth_tolerance: float, elevation_tolerance: float
 ) -> pd.DataFrame:
@@ -188,16 +200,20 @@ def _add_group_chart_sheet(
     chart.title = f"{sheet_name} SNR vs Elevation"
     chart.x_axis.title = "Elevation (deg)"
     chart.y_axis.title = "Signal-to-noise ratio"
-    chart.x_axis.scaling.min = 3
+    chart.x_axis.scaling.min = 5
     elevation_cols = [
         col for col in output_frame.columns if col.endswith("6_2_elevation")
     ]
     if elevation_cols:
-        max_elevation = pd.to_numeric(
-            output_frame[elevation_cols].stack(), errors="coerce"
-        ).max()
+        max_elevation = max(
+            (
+                _max_center_elevation(output_frame[col])
+                for col in elevation_cols
+            ),
+            default=float("nan"),
+        )
         if pd.notna(max_elevation):
-            chart.x_axis.scaling.max = max(3, math.ceil(float(max_elevation)))
+            chart.x_axis.scaling.max = max(5, math.ceil(float(max_elevation)))
 
     headers = list(output_frame.columns)
     elevation_cols: Dict[str, int] = {}
