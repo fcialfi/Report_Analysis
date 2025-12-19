@@ -11,8 +11,23 @@ from openpyxl.styles import Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 
 
+def _open_excel(path: Path) -> pd.ExcelFile:
+    try:
+        return pd.ExcelFile(path)
+    except Exception as exc:  # pragma: no cover - fallback for invalid engine detection
+        if "io.excel.zip.reader" in str(exc):
+            try:
+                return pd.ExcelFile(path, engine="openpyxl")
+            except Exception as inner:
+                raise ValueError(
+                    f"{path} appears to be a ZIP archive rather than a supported "
+                    "Excel workbook. Ensure the file is a valid .xlsx/.xlsm workbook."
+                ) from inner
+        raise
+
+
 def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
-    excel = pd.ExcelFile(path)
+    excel = _open_excel(path)
     resolved_sheet = sheet_name
     if sheet_name not in excel.sheet_names:
         matching_sheets = []
@@ -71,7 +86,7 @@ def _process_file(path: Path) -> pd.DataFrame:
 
 
 def _extract_start_time(path: Path) -> pd.Timestamp:
-    excel = pd.ExcelFile(path)
+    excel = _open_excel(path)
     if "__meta__" not in excel.sheet_names:
         available = ", ".join(excel.sheet_names)
         raise ValueError(
