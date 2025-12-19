@@ -223,47 +223,22 @@ def _add_group_chart_sheet(
         return
 
     chart_sheet = workbook.create_sheet(title=f"{sheet_name} Chart")
-    chart = ScatterChart()
-    chart.title = f"{sheet_name} SNR vs Elevation"
-    chart.x_axis.title = "Elevation (deg)"
-    chart.y_axis.title = "Signal-to-noise ratio"
-    chart.x_axis.tickLblPos = "nextTo"
-    chart.y_axis.tickLblPos = "nextTo"
-    chart.x_axis.delete = False
-    chart.y_axis.delete = False
-    chart.x_axis.majorTickMark = "out"
-    chart.y_axis.majorTickMark = "out"
-    signed_elevation_cols = [
-        col for col in output_frame.columns if col.endswith("6_2_elevation_signed")
-    ]
-    elevation_cols = [
-        col for col in output_frame.columns if col.endswith("6_2_elevation")
-    ]
-    if signed_elevation_cols:
-        chart.x_axis.title = "Elevation (deg, signed)"
-        max_elevation = max(
-            (
-                _max_center_elevation(output_frame[col].abs())
-                for col in signed_elevation_cols
-            ),
-            default=float("nan"),
-        )
-        if pd.notna(max_elevation):
-            max_elevation = max(5, math.ceil(float(max_elevation)))
-            chart.x_axis.scaling.min = -max_elevation
-            chart.x_axis.scaling.max = max_elevation
-    else:
+    ascending_chart = ScatterChart()
+    descending_chart = ScatterChart()
+    for chart, title in (
+        (ascending_chart, f"{sheet_name} SNR vs Elevation (Ascending)"),
+        (descending_chart, f"{sheet_name} SNR vs Elevation (Descending)"),
+    ):
+        chart.title = title
+        chart.x_axis.title = "Elevation (deg)"
+        chart.y_axis.title = "Signal-to-noise ratio"
+        chart.x_axis.tickLblPos = "nextTo"
+        chart.y_axis.tickLblPos = "nextTo"
+        chart.x_axis.delete = False
+        chart.y_axis.delete = False
+        chart.x_axis.majorTickMark = "out"
+        chart.y_axis.majorTickMark = "out"
         chart.x_axis.scaling.min = 5
-        if elevation_cols:
-            max_elevation = max(
-                (
-                    _max_center_elevation(output_frame[col])
-                    for col in elevation_cols
-                ),
-                default=float("nan"),
-            )
-            if pd.notna(max_elevation):
-                chart.x_axis.scaling.max = max(5, math.ceil(float(max_elevation)))
 
     headers = list(output_frame.columns)
     elevation_cols: Dict[str, int] = {}
@@ -279,26 +254,101 @@ def _add_group_chart_sheet(
 
     data_start_row = 3
     data_end_row = 2 + output_frame.shape[0]
-    for orbit, snr_col in sorted(snr_cols.items(), key=lambda item: int(item[0])):
-        elev_col = signed_elevation_cols.get(orbit) or elevation_cols.get(orbit)
-        if elev_col is None:
-            continue
-        values = Reference(
-            source_sheet,
-            min_col=snr_col,
-            min_row=data_start_row,
-            max_row=data_end_row,
+    elevation_values = [
+        output_frame[col] for col in output_frame.columns if col.endswith("6_2_elevation")
+    ]
+    if elevation_values:
+        max_elevation = max(
+            (_max_center_elevation(series) for series in elevation_values),
+            default=float("nan"),
         )
-        xvalues = Reference(
-            source_sheet,
-            min_col=elev_col,
-            min_row=data_start_row,
-            max_row=data_end_row,
-        )
-        series = Series(values, xvalues, title=f"Orbit {orbit}")
-        chart.series.append(series)
+        if pd.notna(max_elevation):
+            max_elevation = max(5, math.ceil(float(max_elevation)))
+            ascending_chart.x_axis.scaling.max = max_elevation
+            descending_chart.x_axis.scaling.max = max_elevation
 
-    chart_sheet.add_chart(chart, "A1")
+    helper_start_col = len(headers) + 1
+    current_col = helper_start_col
+    for orbit in sorted(snr_cols.keys(), key=int):
+        elev_col = elevation_cols.get(orbit)
+        signed_col = signed_elevation_cols.get(orbit)
+        snr_col = snr_cols.get(orbit)
+        if elev_col is None or signed_col is None or snr_col is None:
+            continue
+
+        asc_elev_col = current_col
+        asc_snr_col = current_col + 1
+        desc_elev_col = current_col + 2
+        desc_snr_col = current_col + 3
+        current_col += 4
+
+        source_sheet.cell(
+            row=2, column=asc_elev_col, value=f"Orbit {orbit} elevation ascending"
+        )
+        source_sheet.cell(
+            row=2, column=asc_snr_col, value=f"Orbit {orbit} SNR ascending"
+        )
+        source_sheet.cell(
+            row=2, column=desc_elev_col, value=f"Orbit {orbit} elevation descending"
+        )
+        source_sheet.cell(
+            row=2, column=desc_snr_col, value=f"Orbit {orbit} SNR descending"
+        )
+
+        elev_series = output_frame[f"Orbit {orbit} 6_2_elevation"].reset_index(drop=True)
+        snr_series = output_frame[
+            f"Orbit {orbit} 5_10_signal_noise_ratio"
+        ].reset_index(drop=True)
+        signed_series = output_frame[
+            f"Orbit {orbit} 6_2_elevation_signed"
+        ].reset_index(drop=True)
+
+        for row_offset, (elev, snr, signed) in enumerate(
+            zip(elev_series, snr_series, signed_series), start=data_start_row
+        ):
+            if pd.isna(signed):
+                continue
+            if signed < 0:
+                source_sheet.cell(row=row_offset, column=asc_elev_col, value=elev)
+                source_sheet.cell(row=row_offset, column=asc_snr_col, value=snr)
+            else:
+                source_sheet.cell(row=row_offset, column=desc_elev_col, value=elev)
+                source_sheet.cell(row=row_offset, column=desc_snr_col, value=snr)
+
+        asc_values = Reference(
+            source_sheet,
+            min_col=asc_snr_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        asc_xvalues = Reference(
+            source_sheet,
+            min_col=asc_elev_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        ascending_chart.series.append(
+            Series(asc_values, asc_xvalues, title=f"Orbit {orbit}")
+        )
+
+        desc_values = Reference(
+            source_sheet,
+            min_col=desc_snr_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        desc_xvalues = Reference(
+            source_sheet,
+            min_col=desc_elev_col,
+            min_row=data_start_row,
+            max_row=data_end_row,
+        )
+        descending_chart.series.append(
+            Series(desc_values, desc_xvalues, title=f"Orbit {orbit}")
+        )
+
+    chart_sheet.add_chart(ascending_chart, "A1")
+    chart_sheet.add_chart(descending_chart, "A20")
 
 
 def main() -> int:
