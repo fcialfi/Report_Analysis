@@ -5,7 +5,9 @@ from pathlib import Path
 from typing import Dict, List, Tuple
 
 import pandas as pd
+from openpyxl.chart import ScatterChart, Series, Reference
 from openpyxl.styles import Alignment
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 
 def _load_sheet(path: Path, sheet_name: str) -> pd.DataFrame:
@@ -115,6 +117,46 @@ def _extract_orbit(path: Path) -> int:
     return int(match.group(1))
 
 
+def _bin_series(series: pd.Series, tolerance: float) -> pd.Series:
+    if tolerance <= 0:
+        return series
+    return (series / tolerance).round() * tolerance
+
+
+def _build_correlation_table(
+    frames: List[pd.DataFrame], azimuth_tolerance: float, elevation_tolerance: float
+) -> pd.DataFrame:
+    aligned_frames: List[pd.DataFrame] = []
+    for frame in frames:
+        orbit = int(frame["orbit"].iloc[0])
+        aligned = frame[
+            ["6_1_azimuth", "6_2_elevation", "5_10_signal_noise_ratio"]
+        ].copy()
+        aligned["azimuth_bin"] = _bin_series(aligned["6_1_azimuth"], azimuth_tolerance)
+        aligned["elevation_bin"] = _bin_series(
+            aligned["6_2_elevation"], elevation_tolerance
+        )
+        aligned = (
+            aligned.groupby(["azimuth_bin", "elevation_bin"], as_index=False)
+            .agg({"5_10_signal_noise_ratio": "mean"})
+            .rename(
+                columns={
+                    "5_10_signal_noise_ratio": f"Orbit {orbit} SNR",
+                }
+            )
+        )
+        aligned_frames.append(aligned)
+
+    if not aligned_frames:
+        return pd.DataFrame()
+
+    merged = aligned_frames[0]
+    for aligned in aligned_frames[1:]:
+        merged = merged.merge(aligned, on=["azimuth_bin", "elevation_bin"], how="inner")
+
+    return merged.sort_values(["azimuth_bin", "elevation_bin"]).reset_index(drop=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -133,6 +175,18 @@ def main() -> int:
         "--output",
         default="meos_processed.xlsx",
         help="Output Excel file path.",
+    )
+    parser.add_argument(
+        "--azimuth-tolerance",
+        type=float,
+        default=0.1,
+        help="Tolerance (degrees) for matching azimuth values between orbits.",
+    )
+    parser.add_argument(
+        "--elevation-tolerance",
+        type=float,
+        default=0.1,
+        help="Tolerance (degrees) for matching elevation values between orbits.",
     )
     args = parser.parse_args()
 
@@ -221,6 +275,54 @@ def main() -> int:
                 title_cell = worksheet.cell(row=1, column=1)
                 title_cell.value = sheet_name
                 title_cell.alignment = Alignment(horizontal="center")
+
+            frames_only = [frame for frame, _ in group_items]
+            correlation_frame = _build_correlation_table(
+                frames_only,
+                args.azimuth_tolerance,
+                args.elevation_tolerance,
+            )
+            if not correlation_frame.empty:
+                data_end_row = 2 + output_frame.shape[0]
+                title_row = data_end_row + 2
+                worksheet.cell(
+                    row=title_row,
+                    column=1,
+                    value="SNR Correlation (Azimuth/Elevation matched)",
+                )
+                header_row = title_row + 1
+                for row_idx, row in enumerate(
+                    dataframe_to_rows(correlation_frame, index=False, header=True),
+                    start=header_row,
+                ):
+                    for col_idx, value in enumerate(row, start=1):
+                        worksheet.cell(row=row_idx, column=col_idx, value=value)
+
+                chart = ScatterChart()
+                chart.title = "SNR by Orbit (Matched Az/El)"
+                chart.x_axis.title = "Azimuth (binned)"
+                chart.y_axis.title = "SNR"
+                data_start_row = header_row + 1
+                data_end_row = data_start_row + correlation_frame.shape[0] - 1
+                azimuth_col = 1
+                for col in range(3, correlation_frame.shape[1] + 1):
+                    values = Reference(
+                        worksheet,
+                        min_col=col,
+                        min_row=data_start_row,
+                        max_row=data_end_row,
+                    )
+                    xvalues = Reference(
+                        worksheet,
+                        min_col=azimuth_col,
+                        min_row=data_start_row,
+                        max_row=data_end_row,
+                    )
+                    series = Series(values, xvalues, title_from_data=False)
+                    series.title = worksheet.cell(row=header_row, column=col).value
+                    chart.series.append(series)
+                chart_anchor = f"A{data_end_row + 2}"
+                worksheet.add_chart(chart, chart_anchor)
 
     total_rows = sum(len(frame) for frame, _, _ in processed_frames)
     print(f"Saved {total_rows} rows to {output_path}")
