@@ -1,5 +1,11 @@
 # Report_Analysis
 
+> **⚠️ Progetto spostato.** Questo codice ora fa parte di
+> [MEOS-Extract](https://github.com/fcialfi/MEOS-Extract) come `report_analysis.py`
+> (con tutta la cronologia), utilizzabile da riga di comando e dalla GUI
+> (opzione *Analisi multi-orbita* e pulsante *Analizza Excel già estratti…*).
+> Questo repository è archiviato e non riceve più aggiornamenti.
+
 Analisi multi-orbita degli Excel prodotti da [MEOS-Extract](https://github.com/fcialfi/MEOS-Extract):
 confronta il rapporto segnale/rumore (SNR) di passaggi diversi in funzione della posizione dell'antenna.
 
